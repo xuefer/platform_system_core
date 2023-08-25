@@ -24,7 +24,9 @@
 #include "sysdeps.h"
 
 #if !ADB_HOST
+#   ifdef ANDROID
 #include <cutils/properties.h>
+#   endif
 #endif
 
 #define  TRACE_TAG  TRACE_SOCKETS
@@ -433,7 +435,11 @@ asocket *create_local_service_socket(const char *name)
     asocket *s;
     int fd;
 #if !ADB_HOST
+#   ifdef ANDROID
     char debug[PROPERTY_VALUE_MAX];
+#   else
+    char debug[] = "1";
+#   endif
 #endif
 
 #if !ADB_HOST
@@ -451,8 +457,10 @@ asocket *create_local_service_socket(const char *name)
     D("LS(%d): bound to '%s' via %d\n", s->id, name, fd);
 
 #if !ADB_HOST
+#   ifdef ANDROID
     if (!strncmp(name, "root:", 5))
         property_get("ro.debuggable", debug, "");
+#   endif
 
     if ((!strncmp(name, "root:", 5) && getuid() != 0
         && strcmp(debug, "1") == 0)

@@ -22,7 +22,9 @@
 #include "sysdeps.h"
 #include <sys/types.h>
 #if !ADB_HOST
+#   ifdef ANDROID
 #include <cutils/properties.h>
+#   endif
 #endif
 
 #define  TRACE_TAG  TRACE_TRANSPORT
@@ -163,6 +165,7 @@ static void *server_socket_thread(void * arg)
 
 /* This is relevant only for ADB daemon running inside the emulator. */
 #if !ADB_HOST
+#ifdef ANDROID
 /*
  * Redefine open and write for qemu_pipe.h that contains inlined references
  * to those routines. We will redifine them back after qemu_pipe.h inclusion.
@@ -270,6 +273,7 @@ static const char _ok_resp[]    = "ok";
     D("transport: qemu_socket_thread() exiting\n");
     return 0;
 }
+#endif // ANDROID
 #endif  // !ADB_HOST
 
 void local_init(int port)
@@ -282,7 +286,7 @@ void local_init(int port)
     } else {
 #if ADB_HOST
         func = server_socket_thread;
-#else
+#elif defined(ANDROID)
         /* For the adbd daemon in the system image we need to distinguish
          * between the device, and the emulator. */
         char is_qemu[PROPERTY_VALUE_MAX];
@@ -294,6 +298,8 @@ void local_init(int port)
             /* Running inside the device: use TCP socket as the transport. */
             func = server_socket_thread;
         }
+#else
+        func = server_socket_thread;
 #endif // !ADB_HOST
     }
 

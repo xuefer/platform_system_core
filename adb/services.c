@@ -33,9 +33,11 @@
 #    include <netdb.h>
 #    include <sys/ioctl.h>
 #  endif
-#else
+#elif defined(ANDROID)
 #  include <cutils/android_reboot.h>
 #  include <cutils/properties.h>
+#else
+#   include <sys/reboot.h>
 #endif
 
 typedef struct stinfo stinfo;
@@ -60,13 +62,16 @@ void *service_bootstrap_func(void *x)
 void restart_root_service(int fd, void *cookie)
 {
     char buf[100];
+#   ifdef ANDROID
     char value[PROPERTY_VALUE_MAX];
+#   endif
 
     if (getuid() == 0) {
         snprintf(buf, sizeof(buf), "adbd is already running as root\n");
         writex(fd, buf, strlen(buf));
         adb_close(fd);
     } else {
+#   ifdef ANDROID
         property_get("ro.debuggable", value, "");
         if (strcmp(value, "1") != 0) {
             snprintf(buf, sizeof(buf), "adbd cannot run as root in production builds\n");
@@ -79,9 +84,11 @@ void restart_root_service(int fd, void *cookie)
         snprintf(buf, sizeof(buf), "restarting adbd as root\n");
         writex(fd, buf, strlen(buf));
         adb_close(fd);
+#   endif
     }
 }
 
+#ifdef ANDROID
 void restart_tcp_service(int fd, void *cookie)
 {
     char buf[100];
@@ -111,9 +118,11 @@ void restart_usb_service(int fd, void *cookie)
     writex(fd, buf, strlen(buf));
     adb_close(fd);
 }
+#endif
 
 void reboot_service(int fd, void *arg)
 {
+#ifdef ANDROID
     char buf[100];
     char property_val[PROPERTY_VALUE_MAX];
     int ret;
@@ -139,6 +148,9 @@ void reboot_service(int fd, void *arg)
 cleanup:
     free(arg);
     adb_close(fd);
+#else
+    reboot(RB_AUTOBOOT);
+#endif
 }
 
 void reverse_service(int fd, void* arg)
@@ -435,6 +447,7 @@ int service_to_fd(const char *name)
         void* arg = strdup(name + 7);
         if (arg == NULL) return -1;
         ret = create_service_thread(reboot_service, arg);
+#   ifdef ANDROID
     } else if(!strncmp(name, "root:", 5)) {
         ret = create_service_thread(restart_root_service, NULL);
     } else if(!strncmp(name, "backup:", 7)) {
@@ -461,6 +474,7 @@ int service_to_fd(const char *name)
         ret = create_service_thread(restart_tcp_service, (void *) (uintptr_t) port);
     } else if(!strncmp(name, "usb:", 4)) {
         ret = create_service_thread(restart_usb_service, NULL);
+#   endif // ANDROID
     } else if (!strncmp(name, "reverse:", 8)) {
         char* cookie = strdup(name + 8);
         if (cookie == NULL) {

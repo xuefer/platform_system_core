@@ -67,7 +67,7 @@ void    adb_trace_init(void);
 #  define ADB_TRACING  ((adb_trace_mask & (1 << TRACE_TAG)) != 0)
 
 /* you must define TRACE_TAG before using this macro */
-#if ADB_HOST
+#if ADB_HOST || !defined(ANDROID)
 #  define  D(...)                                      \
         do {                                           \
             if (ADB_TRACING) {                         \

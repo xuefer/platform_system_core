@@ -35,8 +35,21 @@
 #define MAX_PACKET_SIZE_HS	512
 #define MAX_PACKET_SIZE_SS	1024
 
-#define cpu_to_le16(x)  htole16(x)
-#define cpu_to_le32(x)  htole32(x)
+/*
+ * cpu_to_le16/32 are used when initializing structures, a context where a
+ * function call is not allowed. To solve this, we code cpu_to_le16/32 in a way
+ * that allows them to be used when initializing structures.
+ */
+
+#ifdef HAVE_BIG_ENDIAN
+#define cpu_to_le16(x)  ((((x) >> 8) & 0xffu) | (((x) & 0xffu) << 8))
+#define cpu_to_le32(x)  \
+	((((x) & 0xff000000u) >> 24) | (((x) & 0x00ff0000u) >>  8) | \
+	(((x) & 0x0000ff00u) <<  8) | (((x) & 0x000000ffu) << 24))
+#else
+#define cpu_to_le16(x)  (x)
+#define cpu_to_le32(x)  (x)
+#endif
 
 struct usb_handle
 {

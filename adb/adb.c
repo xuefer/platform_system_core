@@ -34,13 +34,17 @@
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
 #if !ADB_HOST
+#   ifdef ANDROID
 #include <cutils/properties.h>
 #include <private/android_filesystem_config.h>
 #include <sys/capability.h>
+#   endif
 #include <sys/mount.h>
 #include <sys/prctl.h>
 #include <getopt.h>
+#   ifdef ANDROID
 #include <selinux/selinux.h>
+#   endif
 #endif
 
 #if ADB_TRACE
@@ -145,7 +149,7 @@ void  adb_trace_init(void)
     }
 }
 
-#if !ADB_HOST
+#if !ADB_HOST && defined(ANDROID)
 /*
  * Implements ADB tracing inside the emulator.
  */
@@ -161,7 +165,9 @@ void  adb_trace_init(void)
 #undef write
 #define open    adb_open
 #define write   adb_write
+#ifdef ANDROID
 #include <hardware/qemu_pipe.h>
+#endif
 #undef open
 #undef write
 #define open    ___xxx_open
@@ -183,6 +189,7 @@ static int adb_qemu_trace_init(void)
     snprintf(con_name, sizeof(con_name), "qemud:adb-debug");
     adb_debug_qemu = qemu_pipe_open(con_name);
     return (adb_debug_qemu >= 0) ? 0 : -1;
+    return 0;
 }
 
 void adb_qemu_trace(const char* fmt, ...)
@@ -290,7 +297,7 @@ static size_t fill_connect_data(char *buf, size_t bufsize)
 {
 #if ADB_HOST
     return snprintf(buf, bufsize, "host::") + 1;
-#else
+#elif defined(ANDROID)
     static const char *cnxn_props[] = {
         "ro.product.name",
         "ro.product.model",
@@ -313,6 +320,8 @@ static size_t fill_connect_data(char *buf, size_t bufsize)
     }
 
     return bufsize - remaining + 1;
+#else
+    return 0;
 #endif
 }
 
@@ -350,6 +359,7 @@ static void send_connect(atransport *t)
     send_packet(cp, t);
 }
 
+#ifdef ANDROID
 void send_auth_request(atransport *t)
 {
     D("Calling send_auth_request\n");
@@ -413,6 +423,7 @@ void adb_auth_verified(atransport *t)
     handle_online(t);
     send_connect(t);
 }
+#endif
 
 #if ADB_HOST
 static char *connection_state_name(atransport *t)
@@ -557,11 +568,14 @@ void handle_packet(apacket *p, atransport *t)
         if (HOST || !auth_enabled) {
             handle_online(t);
             if(!HOST) send_connect(t);
+#ifdef ANDROID
         } else {
             send_auth_request(t);
+#endif
         }
         break;
 
+#ifdef ANDROID
     case A_AUTH:
         if (p->msg.arg0 == ADB_AUTH_TOKEN) {
             t->connection_state = CS_UNAUTHORIZED;
@@ -585,6 +599,7 @@ void handle_packet(apacket *p, atransport *t)
             adb_auth_confirm_key(p->data, p->msg.data_length, t);
         }
         break;
+#endif
 
     case A_OPEN: /* OPEN(local-id, 0, "destination") */
         if (t->online && p->msg.arg0 != 0 && p->msg.arg1 == 0) {
@@ -1003,6 +1018,7 @@ void start_logging(void)
 #if !ADB_HOST
 void start_device_log(void)
 {
+#ifdef ANDROID
     int fd;
     char    path[PATH_MAX];
     struct tm now;
@@ -1035,6 +1051,7 @@ void start_device_log(void)
     fd = unix_open("/dev/null", O_RDONLY);
     dup2(fd, 0);
     adb_close(fd);
+#endif
 }
 #endif
 
@@ -1236,6 +1253,7 @@ void build_local_name(char* target_str, size_t target_size, int server_port)
 #if !ADB_HOST
 
 static void drop_capabilities_bounding_set_if_needed() {
+#ifdef ANDROID
 #ifdef ALLOW_ADBD_ROOT
     char value[PROPERTY_VALUE_MAX];
     property_get("ro.debuggable", value, "");
@@ -1258,11 +1276,14 @@ static void drop_capabilities_bounding_set_if_needed() {
             exit(1);
         }
     }
+#endif
 }
 
 static int should_drop_privileges() {
 #ifndef ALLOW_ADBD_ROOT
     return 1;
+#elif !defined(ANDROID)
+    return 0;
 #else /* ALLOW_ADBD_ROOT */
     int secure = 0;
     char value[PROPERTY_VALUE_MAX];
@@ -1297,7 +1318,9 @@ int adb_main(int is_daemon, int server_port)
 {
 #if !ADB_HOST
     int port;
+#   ifdef ANDROID
     char value[PROPERTY_VALUE_MAX];
+#   endif
 
     umask(000);
 #endif
@@ -1328,10 +1351,12 @@ int adb_main(int is_daemon, int server_port)
         exit(1);
     }
 #else
+#   ifdef ANDROID
     property_get("ro.adb.secure", value, "0");
     auth_enabled = !strcmp(value, "1");
     if (auth_enabled)
         adb_auth_init();
+#   endif
 
     // Our external storage path may be different than apps, since
     // we aren't able to bind mount after dropping root.
@@ -1353,16 +1378,19 @@ int adb_main(int is_daemon, int server_port)
     ** AID_SDCARD_RW to allow writing to the SD card
     ** AID_NET_BW_STATS to read out qtaguid statistics
     */
+#ifdef ANDROID
     gid_t groups[] = { AID_ADB, AID_LOG, AID_INPUT, AID_INET, AID_NET_BT,
                        AID_NET_BT_ADMIN, AID_SDCARD_R, AID_SDCARD_RW,
                        AID_NET_BW_STATS };
     if (setgroups(sizeof(groups)/sizeof(groups[0]), groups) != 0) {
         exit(1);
     }
+#endif
 
     /* don't listen on a port (default 5037) if running in secure mode */
     /* don't run as root if we are running in secure mode */
     if (should_drop_privileges()) {
+#ifdef ANDROID
         drop_capabilities_bounding_set_if_needed();
 
         /* then switch user and group to "shell" */
@@ -1374,14 +1402,17 @@ int adb_main(int is_daemon, int server_port)
         }
 
         D("Local port disabled\n");
+#endif
     } else {
         char local_name[30];
+#ifdef ANDROID
         if ((root_seclabel != NULL) && (is_selinux_enabled() > 0)) {
             // b/12587913: fix setcon to allow const pointers
             if (setcon((char *)root_seclabel) < 0) {
                 exit(1);
             }
         }
+#endif
         build_local_name(local_name, sizeof(local_name), server_port);
         if(install_listener(local_name, "*smartsocket*", NULL, 0)) {
             exit(1);
@@ -1398,6 +1429,7 @@ int adb_main(int is_daemon, int server_port)
     // If one of these properties is set, also listen on that port
     // If one of the properties isn't set and we couldn't listen on usb,
     // listen on the default port.
+#   ifdef ANDROID
     property_get("service.adb.tcp.port", value, "");
     if (!value[0]) {
         property_get("persist.adb.tcp.port", value, "");
@@ -1410,6 +1442,7 @@ int adb_main(int is_daemon, int server_port)
         // listen on default port
         local_init(DEFAULT_ADB_LOCAL_TRANSPORT_PORT);
     }
+#   endif
 
     D("adb_main(): pre init_jdwp()\n");
     init_jdwp();
@@ -1692,7 +1725,9 @@ int main(int argc, char **argv)
 #else
     /* If adbd runs inside the emulator this will enable adb tracing via
      * adb-debug qemud service in the emulator. */
+#ifdef ANDROID
     adb_qemu_trace_init();
+#endif
     while(1) {
         int c;
         int option_index = 0;
