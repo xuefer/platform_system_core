@@ -24,7 +24,6 @@
 #include <dirent.h>
 #include <limits.h>
 #include <sys/types.h>
-#include <zipfile/zipfile.h>
 #include <utime.h>
 
 #include "sysdeps.h"
