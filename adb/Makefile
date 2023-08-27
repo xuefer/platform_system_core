@@ -58,6 +58,8 @@ ADBD_SRCS+= socket_local_server.c
 ADBD_SRCS+= socket_loopback_client.c
 ADBD_SRCS+= socket_loopback_server.c
 
+ADBD_LIBS+= -lpthread
+
 ADBD_OBJS= $(ADBD_SRCS:.c=.adbd.o)
 %.adbd.o: %.c
 	$(CC) -c $(ADBD_CPPFLAGS) $(CPPFLAGS) -o $@ $<
