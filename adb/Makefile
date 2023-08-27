@@ -49,6 +49,7 @@ ADBD_SRCS+= services.c
 ADBD_SRCS+= file_sync_service.c
 ADBD_SRCS+= jdwp_service.c
 ADBD_SRCS+= usb_linux_client.c
+ADBD_SRCS+= udc_controller.c
 
 ADBD_SRCS+= socket_inaddr_any_server.c
 ADBD_SRCS+= socket_local_client.c

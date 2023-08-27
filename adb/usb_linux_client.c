@@ -30,6 +30,7 @@
 
 #define   TRACE_TAG  TRACE_USB
 #include "adb.h"
+#include "udc_controller.h"
 
 #define MAX_PACKET_SIZE_FS	64
 #define MAX_PACKET_SIZE_HS	512
@@ -340,6 +341,8 @@ static void init_functionfs(struct usb_handle *h)
         D("[ %s: cannot open bulk-in ep: errno=%d ]\n", USB_FFS_ADB_IN, errno);
         goto err;
     }
+
+    set_udc();
 
     return;
 
