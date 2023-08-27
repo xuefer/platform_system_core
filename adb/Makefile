@@ -48,8 +48,6 @@ ADBD_SRCS+= sockets.c
 ADBD_SRCS+= services.c
 ADBD_SRCS+= file_sync_service.c
 ADBD_SRCS+= jdwp_service.c
-ADBD_SRCS+= framebuffer_service.c
-ADBD_SRCS+= remount_service.c
 ADBD_SRCS+= usb_linux_client.c
 
 ADBD_SRCS+= socket_inaddr_any_server.c

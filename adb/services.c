@@ -431,18 +431,22 @@ int service_to_fd(const char *name)
 #if !ADB_HOST
     } else if(!strncmp("dev:", name, 4)) {
         ret = unix_open(name + 4, O_RDWR | O_CLOEXEC);
+#   ifdef ANDROID
     } else if(!strncmp(name, "framebuffer:", 12)) {
         ret = create_service_thread(framebuffer_service, 0);
     } else if (!strncmp(name, "jdwp:", 5)) {
         ret = create_jdwp_connection_fd(atoi(name+5));
+#   endif
     } else if(!HOST && !strncmp(name, "shell:", 6)) {
         ret = create_subproc_thread(name + 6, SUBPROC_PTY);
     } else if(!HOST && !strncmp(name, "exec:", 5)) {
         ret = create_subproc_thread(name + 5, SUBPROC_RAW);
     } else if(!strncmp(name, "sync:", 5)) {
         ret = create_service_thread(file_sync_service, NULL);
+#   ifdef ANDROID
     } else if(!strncmp(name, "remount:", 8)) {
         ret = create_service_thread(remount_service, NULL);
+#   endif
     } else if(!strncmp(name, "reboot:", 7)) {
         void* arg = strdup(name + 7);
         if (arg == NULL) return -1;
@@ -485,10 +489,12 @@ int service_to_fd(const char *name)
                 free(cookie);
             }
         }
+#   ifdef ANDROID
     } else if(!strncmp(name, "disable-verity:", 15)) {
         ret = create_service_thread(set_verity_enabled_state_service, (void*)0);
     } else if(!strncmp(name, "enable-verity:", 15)) {
         ret = create_service_thread(set_verity_enabled_state_service, (void*)1);
+#   endif
 #endif
     }
     if (ret >= 0) {
