@@ -1727,6 +1727,8 @@ int main(int argc, char **argv)
      * adb-debug qemud service in the emulator. */
 #ifdef ANDROID
     adb_qemu_trace_init();
+#else
+    adb_trace_init();
 #endif
     while(1) {
         int c;
